@@ -101,8 +101,23 @@ if ! mkdir -vp "$CHROOT" ; then
     die "Could not create the chroot directory at $CHROOT"
 fi
 
+#Install the three needed packages if they are not already installed
 if [ ! -f /usr/sbin/debootstrap ] ; then
-    sudo apt-get -y install debootstrap
+    if ! sudo apt-get -y install debootstrap ; then
+        die "Could not install debootstrap"
+    fi
+fi
+
+if [ ! -f /usr/bin/mksquashfs ] ; then
+    if ! sudo apt-get -y install squashfs-tools ; then
+        die "Could not install squashfs-tools"
+    fi
+fi
+
+if [ ! -f /usr/bin/extlinux ] ; then
+    if ! sudo apt-get -y install extlinux ; then
+        die "Could not install extlinux boot loader"
+    fi
 fi
 
 echo 'Bootstraping in a basic system'
@@ -443,11 +458,6 @@ label Debian
   append initrd=/$(echo boot/initrd.img*) -- boot=live quiet splash toram=filesystem.squashfs acpi=off vga=0x305
 EOF
 popd > /dev/null
-
-if ! which extlinux > /dev/null ; then
-    echo 'Installing Extlinux'
-    apt-get -y install extlinux
-fi
 
 if ! extlinux --install $MNT/extlinux 2> /dev/null ; then
     die 'Could not install extlinux'
