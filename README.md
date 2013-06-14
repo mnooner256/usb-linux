@@ -47,7 +47,7 @@ directory (we will create it later) on a partition that has several hundred
 megabytes of space. For example, /media/chroot, or /home/me/chroot
 * **$ARCH** - We need a variable that tells us what type of architecture we are
 going to install, e.g. i386, amd64, etc.
-* $CODE_NAME** - This variable tells us what version of system we are
+* **$CODE_NAME** - This variable tells us what version of system we are
 installing. This is done by providing the adjective in the distro's version
 code name. Note, this value is case sensitive, always use lower case. For
 example, "testing" or "stable".
