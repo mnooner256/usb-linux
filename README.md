@@ -24,7 +24,8 @@ Usage
 
 This is basically just a very long bash script. You will probably need to
 adjust the variable values at the top of the script. After that simply run
-the script as the root user.
+the script as the root user. Note, this script relies on the underlying OS being
+Debian Linux or a derivative (i.e. Ubuntu, Mint, etc).
 
 ```bash
 $ sudo ./install-usb
@@ -37,7 +38,7 @@ Every computer system is different. Toward this end, the script can be easily
 configured by simply changing the values of several variables located at the
 beginning of the script.
 
-* $DEV - This variable corresponds to the USB device file for the drive you
+* **$DEV** - This variable corresponds to the USB device file for the drive you
 wish to install the distro on. For example, /dev/sdb
 * $CHROOT - This variable will hold the location of the directory we are going
 to install the minimal system into. We will later chroot into the environment.
