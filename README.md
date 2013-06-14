@@ -39,26 +39,26 @@ beginning of the script.
 
 * $DEV - This variable corresponds to the USB device file for the drive you
 wish to install the distro on. For example, /dev/sdb
-* $CHROOT - This variable will hold the location of the directory we are going to install
-the minimal system into. We will later chroot into the environment. The path
-used does not matter, except it should point to an non-existent directory
-(we will create it later) on a partition that has several hundred megabytes
-of space. For example, /media/chroot, or /home/me/chroot
-* $ARCH - We need a variable that tells us what type of architecture we are going to
-install, e.g. i386, amd64, etc.
-$CODE_NAME - This variable tells us what version of system we are installing. This is
-done by providing the adjective in the distro's version code name. Note, this
-value is case sensitive, always use lower case. For example, "testing" or
-"stable".
-$MNT - This variable will hold the directory we will use to mount our USB
+* $CHROOT - This variable will hold the location of the directory we are going
+to install the minimal system into. We will later chroot into the environment.
+The path used does not matter, except it should point to an non-existent
+directory (we will create it later) on a partition that has several hundred
+megabytes of space. For example, /media/chroot, or /home/me/chroot
+* $ARCH - We need a variable that tells us what type of architecture we are
+going to install, e.g. i386, amd64, etc.
+* $CODE_NAME - This variable tells us what version of system we are
+installing. This is done by providing the adjective in the distro's version
+code name. Note, this value is case sensitive, always use lower case. For
+example, "testing" or "stable".
+* $MNT - This variable will hold the directory we will use to mount our USB
 device onto. We have to mount the USB so that we can copy the filesystem
 onto it. For example, /mnt or /media/usb.
-$MIRROR - This variable that will hold our primary repository. You can use any
+* $MIRROR - This variable that will hold our primary repository. You can use any
 valid debian mirror. By default this value uses the main
 "http://http.us.debian.org/debian/" mirror.
-$HTTP_CLIENT_SCRIPT - Installation to the hard drive is handled by a separate script. We do not
-want to recreate the USB drive OS just to update the script. So the process
-is configured to download the script when tty1 logs in after boot. This
-variable holds the client installation script URL.
-$KERNEL - This variable holds the name of the kernel to install.
+* $HTTP_CLIENT_SCRIPT - Installation to the hard drive is handled by a separate
+script. We do not want to recreate the USB drive OS just to update the script.
+So the process is configured to download the script when tty1 logs in after
+boot. This variable holds the client installation script URL.
+* $KERNEL - This variable holds the name of the kernel to install.
 
