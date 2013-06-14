@@ -6,7 +6,6 @@ if [[ "$UID" != "0" ]] ; then
 fi
 
 export DEV='/dev/sdc'
-export USB="${DEV}1"
 export CHROOT='/media/chroot'
 export ARCH='i386'
 export CODE_NAME='testing'
@@ -75,6 +74,9 @@ if mount | grep $USB >/dev/null ; then
         die "Could not unmount $USB"
     fi
 fi
+
+#The partition device file, e.g. /dev/sdb1
+export USB="${DEV}1"
 
 echo "Remaking the file USB drive's partition table"
 if ! ( echo -e 'o\nn\np\n1\n\n\nt\n83\na\n1\nw\n' | fdisk -c -u "$DEV" ) ; then
