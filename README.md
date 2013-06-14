@@ -8,7 +8,7 @@ Windows and Winsync with minimal user intervention.
 
 This distro is also used to access machines that have a broken OS. To that end
 it comes with a LXDE, Ice Weasel, and Filezilla. To save RAM they are not
-started by default.
+started by default (see **$EXTRAS** below).
 
 The created distro has several features. The most important of which is it
 loads completely into RAM. This means that it takes about 30 seconds from
