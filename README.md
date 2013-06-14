@@ -26,8 +26,9 @@ This is basically just a very long bash script. You will probably need to
 adjust the variable values at the top of the script. After that simply run
 the script as the root user.
 
-::
+```bash
 $ sudo ./install-usb
+```
 
 Important Variables
 -------------------
