@@ -1,0 +1,464 @@
+#!/bin/bash -e
+
+if [[ "$UID" != "0" ]] ; then
+    echo 'This script can only be run as root'
+    exit 1
+fi
+
+export DEV='/dev/sdc'
+export USB="${DEV}1"
+export CHROOT='/media/chroot'
+export ARCH='i386'
+export CODE_NAME='testing'
+export MNT='/mnt'
+export MIRROR='http://http.us.debian.org/debian/'
+export HTTP_CLIENT_SCRIPT='http://sun0.cs.uca.edu/ubuntu/client-install.sh'
+export KERNEL="linux-image-686"
+
+#These are extra packages that make using the USB for 
+#non-installation tasks easier.
+export EXTRAS='xorg lxde-common iceweasel build-essential ntfs-3g rsync p7zip unzip unrar'
+
+#This funtion checks that a given device or path is mounted, and if the
+#parameter is, this function then unmounts it.
+#param: A mount point or device file
+function unmount {
+    if mount | grep $1 > /dev/null ; then
+        if ! umount -v -f $1 ; then
+            #Try lazy unmounting as a last resort
+            umount -v -l $1
+        fi
+    fi
+}
+
+#This function unmounts all the mount-points created in this script. It is used
+#to clean-up at the end or after an error occurs. This function does not check
+#"devices" it instead calls the unmount function using mount points. Hence the
+#$USB device may still be mounted after a call to this function if it is
+#mounted anywhere other then $MNT.
+function unmount_all {
+    unmount $CHROOT/proc
+    unmount $CHROOT/dev/pts
+    unmount $CHROOT/dev/shm
+    unmount $CHROOT/dev
+    unmount $CHROOT/sys
+    unmount $CHROOT/boot
+    unmount $MNT
+}
+
+#This function is used to cleanly exit the script. It does this by unmounting 
+#all devices, displaying a given error message, and exiting with an error
+#code.
+#param: The error message to display.
+#usage: die "This is an error"
+function die {
+    unmount_all
+    echo
+    echo "***************************************************"
+    echo "$@"
+    echo "***************************************************"
+    echo
+    exit 1
+}
+
+#We may have been left in a bad state so unmount everything
+unmount_all
+
+if [ ! -e $DEV ] ; then
+    die "USB device $DEV does not exist."
+fi
+
+#Unmount the USB drive if it is mounted
+if mount | grep $USB >/dev/null ; then
+    echo "Unmounting device $USB"
+    if ! umount -v $USB ; then
+        die "Could not unmount $USB"
+    fi
+fi
+
+echo "Remaking the file USB drive's partition table"
+if ! ( echo -e 'o\nn\np\n1\n\n\nt\n83\na\n1\nw\n' | fdisk -c -u "$DEV" ) ; then
+    die 'Could not fix the USB drives partition table'
+fi
+
+echo "Formating and tuning the USB drive"
+if ! (mkfs.ext3 -L 'USB-Installer' "$USB" && tune2fs -c 0 -i 0 $USB) ; then
+   die 'Could not format drive'
+fi
+
+#If the $CHROOT directory exits, destroy it so we have a clean slate.
+if [ -d $CHROOT ] ; then
+    echo "Clearing $CHROOT for a clean slate ..."
+    if ! rm -rf "$CHROOT" ; then
+        die "Could not remove the directory"
+    fi
+fi
+
+#Create the $CHROOT directory
+if ! mkdir -vp "$CHROOT" ; then
+    die "Could not create the chroot directory at $CHROOT"
+fi
+
+if [ ! -f /usr/sbin/debootstrap ] ; then
+    sudo apt-get -y install debootstrap
+fi
+
+echo 'Bootstraping in a basic system'
+if ! /usr/sbin/debootstrap --arch "$ARCH" "$CODE_NAME" "$CHROOT" "$MIRROR" ; then
+    die 'Failed to bootstrap'
+fi
+
+#Copy the timezone info from the system to the new USB drive
+if ! cp /etc/timezone "$CHROOT/etc/timezone" ; then
+    die 'Failed to update the /etc/timezone file'
+fi
+
+#Set some imporant networking configuration files
+echo "Set $CHROOT/etc/hostname"
+if ! echo 'usb' > $CHROOT/etc/hostname ; then
+    die "Failed to update the /etc/hostname file"
+fi
+
+if ! echo '127.0.0.1 localhost usb' > $CHROOT/etc/hosts ; then
+    die 'Failed to create the /etc/hosts file'
+fi
+
+if ! echo "deb $MIRROR ${CODE_NAME} main contrib non-free
+deb http://security.debian.org ${CODE_NAME}/updates main contrib non-free
+" > $CHROOT/etc/apt/sources.list ; then
+    die 'Failed to create /etc/apt/sources.list file'
+fi
+
+if ! echo "
+proc      /proc     proc    defaults          0 0
+tmpfs     /tmp      tmpfs   defaults,noatime  0 0
+ 
+#Allow useless files to be automatically deleted
+tmpfs     /var/lock tmpfs   defaults,noatime  0 0
+tmpfs     /var/run  tmpfs   defaults,noatime  0 0
+tmpfs     /var/tmp  tmpfs   defaults,noatime  0 0
+" > $CHROOT/etc/fstab ; then
+    die 'Failed to create /etc/fstab file'
+fi
+
+if ! echo "
+# Kernel Image management overrides
+# See kernel-img.conf(5) for details
+do_symlinks = yes
+relative_links = yes
+do_bootloader = no
+do_bootfloppy = no
+do_initrd = yes
+link_in_boot = no" > $CHROOT/etc/kernel-img.conf ; then
+    die 'Failed to create /etc/kernel-img.conf file'
+fi
+
+if ! echo "syntax on
+set noai
+set expandtab
+set ts=2
+set sw=2" > $CHROOT/root/.vimrc ; then
+    die 'Failed to create /root/.vimrc file'
+fi
+
+if ! cp $CHROOT/root/.vimrc $CHROOT/etc/skel/ ; then
+    die 'Copy the .vimrc file to /etc/skel'
+fi
+
+
+echo "Binding the needed directories under $CHROOT ..."
+if [ ! -d ${CHROOT}${MNT} ] ; then
+    mkdir ${CHROOT}${MNT}
+fi
+
+if ! (mount -v --bind /proc $CHROOT/proc       &&
+      mount -v --bind /sys $CHROOT/sys         &&
+      mount -v --bind /dev $CHROOT/dev         &&
+      mount -v --bind /dev/pts $CHROOT/dev/pts &&
+      mount -v --bind /dev/shm $CHROOT/dev/shm ) ; then
+    die 'A mount failed!'
+fi
+
+if ! mount -v -t ext3 $USB $MNT ; then
+    die "Failed to mount $USB at $MNT"
+fi
+
+if ! mkdir -v $MNT/boot $MNT/live ; then
+    die "Could not create $MNT/boot and $MNT/live"
+fi
+
+if ! mount -v -o bind $MNT/boot $CHROOT/boot ; then
+    die "Could not bind $MNT/boot to $CHROOT/boot"
+fi
+
+#Install the .bashrc file for the new system
+cat > $CHROOT/root/.bashrc <<EOF
+#!/bin/bash
+
+#Include the default bashrc file
+. /etc/skel/.bashrc
+ 
+#Set the prompt
+export PS1="\\[\\033[0;31m\\]\\u:\\w#\\[\\033[0m\\] "
+ 
+umask 022
+ 
+#Make file removal interactive by default
+alias rm="rm -i"
+
+if ! ifconfig eth0 2> /dev/null | grep -q 'inet addr' ; then
+  sed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces
+  mv /tmp/interfaces  /etc/network/interfaces
+
+  if ! ( /etc/init.d/networking stop && /etc/init.d/networking start ); then
+    echo "Networking is not functioning!!!!"
+  fi
+fi
+ 
+#If this is the first virtual terminal, then download and run the installer
+if tty | grep tty1 > /dev/null ; then
+  #Fetch the file
+  if ! wget -O - '$HTTP_CLIENT_SCRIPT' > \$HOME/client-install.sh ; then
+    if [ -e \$HOME/client-install.sh ] ; then
+      rm -f \$HOME/client-install.sh
+    fi
+    echo 'Failed to download the client script'
+  fi
+  
+  #Make sure the download went OK
+  if [ -e \$HOME/client-install.sh ] ; then
+    #Make the file executable
+    chmod -v u+x \$HOME/client-install.sh
+
+    #Run the script
+    \$HOME/client-install.sh
+  fi
+fi
+EOF
+
+#This should keep any prompts from showing up
+if ! echo "grub-pc grub-pc/kopt_extracted  boolean false
+grub-pc grub2/kfreebsd_cmdline  string
+grub-pc grub2/device_map_regenerated    note
+grub-pc grub-pc/install_devices multiselect     $USB
+grub-pc grub-pc/postrm_purge_boot_grub  boolean false
+grub-pc grub-pc/install_devices_failed_upgrade  boolean true
+grub-pc grub2/linux_cmdline     string
+grub-pc grub-pc/install_devices_empty   boolean false
+grub-pc grub2/kfreebsd_cmdline_default  string  quiet
+grub-pc grub-pc/install_devices_failed  boolean false
+grub-pc grub-pc/install_devices_disks_changed   multiselect
+grub-pc grub2/linux_cmdline_default     string  quiet
+grub-pc grub-pc/chainload_from_menu.lst boolean true
+grub-pc grub-pc/mixed_legacy_and_grub2  boolean true
+keyboard-configuration  keyboard-configuration/modelcode        string  pc105
+keyboard-configuration  keyboard-configuration/unsupported_config_options       booleantrue
+keyboard-configuration  keyboard-configuration/unsupported_config_layout        booleantrue
+keyboard-configuration  keyboard-configuration/toggle   select  No toggling
+keyboard-configuration  keyboard-configuration/compose  select  No compose key
+keyboard-configuration  keyboard-configuration/layout   select
+keyboard-configuration  keyboard-configuration/xkb-keymap       select  us
+keyboard-configuration  keyboard-configuration/variant  select  USA
+keyboard-configuration  keyboard-configuration/switch   select  No temporary switch
+keyboard-configuration  keyboard-configuration/unsupported_options      boolean true
+keyboard-configuration  keyboard-configuration/altgr    select  The default for the keyboard layout
+keyboard-configuration  keyboard-configuration/ctrl_alt_bksp    boolean false
+keyboard-configuration  keyboard-configuration/unsupported_layout       boolean true
+keyboard-configuration  keyboard-configuration/variantcode      string
+keyboard-configuration  keyboard-configuration/model    select  Generic 105-key (Intl) PC
+keyboard-configuration  keyboard-configuration/layoutcode       string  us
+keyboard-configuration  keyboard-configuration/store_defaults_in_debconf_db     booleantrue
+keyboard-configuration  keyboard-configuration/optionscode      string
+console-setup   console-setup/codeset47 select  . Combined - Latin; Slavic Cyrillic; Greek
+console-setup   console-setup/fontface47        select  Fixed
+console-setup   console-setup/fontsize-text47   select  16
+console-setup   console-setup/charmap47 select  UTF-8
+console-setup   console-setup/codesetcode       string  Uni2
+console-setup   console-setup/store_defaults_in_debconf_db      boolean true
+console-setup   console-setup/fontsize-fb47     select  16
+console-setup   console-setup/fontsize  string  16
+" > $CHROOT/root/conf ; then
+    die "Failed to create pre-selections file."
+fi
+
+#Create a script that does installation under chroot
+if ! echo "#!/bin/bash -e
+
+ln -sf /usr/share/zoneinfo/US/Central /etc/localtime
+
+groupadd admin
+usermod -a -G 'users,plugdev,audio,cdrom,admin,disk' root
+passwd -d root
+
+#/usr/sbin/locale-gen en_US.UTF-8
+
+debconf-set-selections /root/conf
+rm /root/conf
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get clean
+apt-get update || apt-get update
+apt-get -y dist-upgrade && apt-get -y autoremove
+
+apt-get -y install grub2
+apt-get -y install $KERNEL dhcpcd squashfs-tools  \
+                   dialog mingetty vim-nox wget jfsutils \
+                   parted gpm laptop-detect debootstrap less  \
+                   initramfs-tools live-boot locales \
+                   debconf-utils #network-manager
+
+apt-get -y install $EXTRAS
+
+apt-get -y clean
+
+#Force a black listing of the old pc-speaker driver
+echo blacklist snd-pcsp >> /etc/modprobe.d/blacklist.conf
+
+
+echo '%admin ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+sed 's|\([0-9]\):.*getty.*|\1:23:respawn:/sbin/mingetty --autologin root --noclear tty\1|' /etc/inittab > /tmp/inittab
+mv /tmp/inittab /etc/inittab
+
+chown root:root /root/.bashrc
+
+" | tee $CHROOT/chroot-install > /dev/null ; then
+    die "Could not create the script that manages the chroot install."
+fi
+
+if ! chmod u+x $CHROOT/chroot-install ; then
+    die "Could not make the chroot install script executable."
+fi
+
+echo 'Performing chroot install ...'
+if ! LANG=C chroot $CHROOT /chroot-install ; then
+    die "Chroot install failed!"
+fi
+
+#udev is attached to *this* machine's network card now.
+#Get rid of this rule to make udev think it is a brand new install
+if ! rm /media/chroot/etc/udev/rules.d/70-persistent-net.rules ; then
+    echo "WARNING: Could not fix network card udev rules"
+fi
+
+#By default the interfaces file has allow-hotplug instead of
+#the auto keyword. The allow-hotplug won't allow the network
+#card to start. We need the interfaces file to be modified
+#before ifup is executed. So we will rewrite part of the
+#networking startup script to fix the interfaces file
+#just before ifup is executed.
+cat $CHROOT/etc/init.d/networking | awk "
+/ifup -a/ { 
+    print \"\tsed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces\" ; 
+    print \"\tmv /tmp/interfaces  /etc/network/interfaces\" 
+} 
+
+{print \$0}" > /tmp/networking
+mv /tmp/networking $CHROOT/etc/init.d/networking
+chmod 755 $CHROOT/etc/init.d/networking
+
+if ! echo 'live/*
+proc/*
+sys/*
+tmp/*
+boot/*
+lost+found/*
+media/*
+mnt/*
+srv/*
+var/lock/*
+var/log/*
+var/tmp/*
+var/run/*
+var/lib/dhcp?/*
+var/lib/urandom/*
+var/cache/apt/archives/*.deb
+var/lib/dpkg/*-old
+var/cache/apt/archives/partial/*.deb
+etc/mtab
+chroot-install
+' | tee $CHROOT/tmp/exclude > /dev/null ; then
+    die 'Could not create the squashfs exclusion file'
+fi
+
+echo 'Discovering what files to zero out...'
+if ! (find $CHROOT/usr/share/doc -type f -size +1b > /tmp/commit_zerosize   &&
+      find $CHROOT/usr/share/man -type f -size +1b >> /tmp/commit_zerosize  &&
+      find $CHROOT/usr/share/info -type f -size +1b >> /tmp/commit_zerosize ) ; then
+    die "Could not find /usr/shar/doc files to zero out"
+fi
+
+echo 'Making the man, doc, and info files have zero size ...'
+NFILES=`wc -l /tmp/commit_zerosize | awk '{ print $1 }'`
+i=1
+cat /tmp/commit_zerosize | while read file ; do
+    echo -n -e "\tZeroing $i/$NFILES files\r"
+    rm $file
+    touch $file
+    i=$[i + 1]
+done ; echo
+
+echo 'Unmounting runtime filesystems'
+unmount $CHROOT/proc
+unmount $CHROOT/dev/pts
+unmount $CHROOT/dev/shm
+unmount $CHROOT/dev
+unmount $CHROOT/sys
+mount -v --bind ${MNT} $CHROOT${MNT}
+
+echo 'Creating the file system file.'
+if ! chroot $CHROOT /usr/bin/mksquashfs / $MNT/live/filesystem.squashfs -noappend -always-use-fragments -wildcards -ef /tmp/exclude -processors 1; then
+    die "Failed to squash the file system."
+fi
+
+echo "Rebinding the needed directories under $CHROOT ..."
+if ! (mount -v --bind /proc $CHROOT/proc       &&
+      mount -v --bind /sys $CHROOT/sys         &&
+      mount -v --bind /dev $CHROOT/dev         &&
+      mount -v --bind /dev/pts $CHROOT/dev/pts &&
+      mount -v --bind /dev/shm $CHROOT/dev/shm ) ; then
+    die 'A mount failed!'
+fi
+
+###############################################################################
+#
+# Install Extlinux
+#
+###############################################################################
+
+if ! mkdir $MNT/extlinux; then
+    echo 'Could not make extlinux directory'
+fi
+
+pushd $MNT >/dev/null
+cat > $MNT/extlinux/extlinux.conf <<EOF
+prompt 0
+timeout 1
+default Debian
+
+label Debian
+  kernel /$(echo boot/vmlinuz*)
+  append initrd=/$(echo boot/initrd.img*) -- boot=live quiet splash toram=filesystem.squashfs acpi=off vga=0x305
+EOF
+popd > /dev/null
+
+if ! which extlinux > /dev/null ; then
+    echo 'Installing Extlinux'
+    apt-get -y install extlinux
+fi
+
+if ! extlinux --install $MNT/extlinux 2> /dev/null ; then
+    die 'Could not install extlinux'
+fi
+
+umount $MNT
+if ! dd if=/usr/lib/syslinux/mbr.bin of=$DEV 2> /dev/null; then
+    die 'Could not install mbr'
+fi
+
+echo 'Cleanly unmounting everything before finishing'
+unmount_all
+
+echo
+echo 'Installation Finished Successfully !!!'
+echo
