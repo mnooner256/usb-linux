@@ -7,8 +7,8 @@ The Winsync server scripts will then automatically kick in and begin installing
 Windows and Winsync with minimal user intervention.
 
 This distro is also used to access machines that have a broken OS. To that end
-it comes with a LXDE and Ice Weasel. To save RAM they are not started by
-default.
+it comes with a LXDE, Ice Weasel, and Filezilla. To save RAM they are not
+started by default.
 
 The created distro has several features. The most important of which is it
 loads completely into RAM. This means that it takes about 30 seconds from
@@ -62,4 +62,6 @@ script. We do not want to recreate the USB drive OS just to update the script.
 So the process is configured to download the script when tty1 logs in after
 boot. This variable holds the client installation script URL.
 * **$KERNEL** - This variable holds the name of the kernel to install.
+* **$EXTRAS** - This is a list of extra packages to install beyond the bare
+minimum system. 
 
