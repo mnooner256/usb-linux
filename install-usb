@@ -41,17 +41,17 @@ export ARCH='amd64'
 #The Ubuntu "code name" to use for setting up apt (leave it as is)
 export CODE_NAME='raring'
 
-#The mirror to use for fetching the initial system files and for apt to use
-#when installing packages
+#The URL of the mirror to use for fetching the initial system files and for
+#apt to use when installing packages
 export MIRROR='http://archive.ubuntu.com/ubuntu'
 
-#This mirror host security updates
+#This URL is the mirror that hosts the security updates
 export SEC_MIRROR="${MIRROR/archive/security}"
 
-#This is the package name for the kernel the LiveCD will use
+#This is the package name for the kernel the system will use
 export KERNEL="linux-image-generic"
 
-#These are the header files for the above kernel
+#This is the package name for the above kernel's header files
 export HEADERS="$(echo $KERNEL | sed 's/image/headers/')"
 
 
@@ -69,22 +69,22 @@ function warn {
     echo -e "\033[1;33mWARNING: $@\033[0;49m"
 }
 
-#This function is used to cleanly exit the script. It does this by unmounting 
+#This function is used to cleanly exit the script. It does this by unmounting
 #all devices, displaying a given error message, and exiting with an error
 #code.
 #param: The error message to display.
 #usage: die "This is an error"
 function error_exit {
     unmount_all
-    
+
     #Create the line of asterisks
     stars=$( printf '%0.1s' "*"{1..75} )
-    
+
     printf "\n\033[1;31m$stars\n\n"
-    
+
     #Print out message, limit the line length to 70 chars
     echo -e "$@" | fold -s -w 70
-    
+
     printf "\n$stars\033[0;49m\n"
     exit 1
 }
@@ -132,7 +132,7 @@ function unmount_all {
     unmount $CHROOT/proc
     unmount $CHROOT/dev
     unmount $CHROOT/tmp
-    
+
     if [[ ! -z "$MNT" ]] ; then
         unmount "$MNT"
         rmdir -v "$MNT" #MNT is a mktemp directory so get rid of it
@@ -154,35 +154,35 @@ elif [[ -b "$1" ]] ; then
     #Be cautious do not use mounted block files
     if grep -q "$1" /proc/mounts ; then
         die "The device is mounted, will not continue\n\n$usage"
-        
+
     #Make sure the file is a root device not a partition
     elif ! ls "/sys/block/${1: -3}" > /dev/null ; then
         die "Use a device, not a partition\n\n$usage"
     fi
-    
+
     #Set the build mode
     BUILD="device"
-    
+
     #This is the physical device we will install the system on
     DEV="$1"
-    
+
     #This will be the partition we will install the system on
     USB="${DEV}1"
-    
+
     info "Will create the system on the device: $DEV"
-    
+
     info "Clearing ${DEV}'s partition table"
     if ! parted -a optimal -s "$DEV" mktable msdos ; then
       die "Could not repartition $DEV"
     fi
-    
+
     info "Creating the $USB partition"
     if ! parted -s -a optimal "$DEV" mkpart primary 0% 100% ; then
         die "Could not create the partition"
     elif ! parted -s "$DEV" set 1 boot on ; then
         die "Could not make the partition bootable."
     fi
-    
+
     info "Formating and tuning ${USB}'s filesystem"
     if ! (mkfs.ext3 -L 'Installer' "$USB" && tune2fs -c 0 -i 0 $USB) ; then
        die 'Could not format partition'
@@ -196,12 +196,12 @@ elif [[ "${1: -4}" != ".iso" ]] ; then
 else
     #Set the build mode
     BUILD="iso"
-    
+
     #This is the final location for the ISO file
     ISO="$1"
-    
+
     info "Will build the iso file: $ISO"
-    
+
     #Make sure the mkisofs program is available so we can create the ISO file
     if ! which mkisofs > /dev/null ; then
         warn "The mkisofs program is not installed, installing it..."
@@ -209,7 +209,7 @@ else
             die "Could not install the genisoimage package (to get mkisofs)"
         fi
     fi
-    
+
     #Clear out the ISO build directory if it exists
     if [[ -e "$ISO_BUILD" ]] ; then
         info "Removing old ISO build directory"
@@ -543,7 +543,7 @@ if [[ "iso" == $BUILD ]] ; then
     if ! mkdir -pv "$ISO_BUILD"/{isolinux,live,boot} ; then
         die "Could not create directories for ISO filesystem at $ISO_BUILD"
     fi
-    
+
     info "Installing $ISO files for booting"
     if ! cp -v "$CHROOT/filesystem.squashfs" "$ISO_BUILD/live/" ; then
         die "Could not copy the filesystem.squashfs file to the CD."
@@ -556,13 +556,13 @@ if [[ "iso" == $BUILD ]] ; then
     if ! cp -v /usr/lib/syslinux/isolinux.bin "$ISO_BUILD/isolinux" ; then
         die "Could not install the isolinux bootloader"
     fi
-    
+
     #mkisofs borks file names with hyphens, it silently changes them to
     #underscore characters. We have to take this into account below.
     #That is the reason for the sed pipeline in this config file.
     info "Creating the isolinux configuration file"
     pushd $CHROOT > /dev/null
-    
+
     info "Install the isolinux.cfg file"
     if ! cp -v "$DEFFILES/isolinux.cfg" "$ISO_BUILD/isolinux/isolinux.cfg" ; then
         die "Could not install the boot loader configuration file"
@@ -578,7 +578,7 @@ if [[ "iso" == $BUILD ]] ; then
     else
         die "Failed to create the ISO file"
     fi
-    
+
     info "Installing ISO at the final location"
     mv -v "$ISOTMP" "$ISO"
 
@@ -592,10 +592,10 @@ else
     # Install On USB Drive
     #
     ##########################################################################
-    
+
     #This is where we are going to mount $USB
     MNT=$(mktemp -d)
-    
+
     info "Mounting pseudo-filesystems"
     if ! (mount -vt proc proc $CHROOT/proc  &&
           mount -vt sysfs sysfs $CHROOT/sys &&
@@ -613,41 +613,39 @@ else
     if ! mkdir -v $MNT/{boot,live} ; then
         die "Could not create needed directories on $MNT"
     fi
-    
+
     info "Installing $USB files for booting"
     if ! cp -v "$CHROOT/filesystem.squashfs" "$MNT/live/" ; then
         die "Could not copy the filesystem.squashfs file to the CD."
     elif ! cp -vR "$CHROOT/boot" "$MNT" ; then
         die "Could not copy the boot directory."
-#    elif ! cp -v $CHROOT/{vmlinuz,initrd.img} $MNT ; then
-#        die "Could not copy the kernel and initrd links"
     fi
-    
+
     #This gets everything after vmlinuz- so we can detect the kernel
     #version. This technique is brittle, so we do some error checking
     #to make sure we got a proper suffix.
     info "Calculating the kernel's version"
     kernel_version=$( ls $MNT/boot/vmlinuz* | head -n 1 | \
                       sed 's|.*vmlinuz-\(.*$\)|\1|' )
-    
+
     info "Found the kernel version: $kernel_version"
     if [[ -z "$kernel_version" ]] ; then
         die "Could not determine the kernel version number"
     elif [[ ! -f "$MNT/boot/vmlinuz-${kernel_version}" ]] ; then
         die "The kernel version \"$kernel_version\" is not a valid kernel suffix"
     fi
-    
+
     #Install the boot loader's configuration file
     info "Inserting the kernel version into the extlinux.conf file"
     if ! sed "s|version|$kernel_version|" "$DEFFILES/extlinux.conf" > "$MNT/extlinux.conf" ; then
         die "Could not copy the boot loader configuration file"
     fi
-    
+
     info 'Installing extlinux bootloader'
     if ! extlinux --install $MNT 2> /dev/null ; then
         die 'Clould not install extlinux'
     fi
-    
+
     info 'Cleanly unmounting everything before finishing'
     unmount_all
 
