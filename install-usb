@@ -20,7 +20,7 @@ export HTTP_CLIENT_SCRIPT='http://sun1.cs.uca.edu:7000/sh/client-install.sh'
 export EXTRAS='xorg lxde-common lxterminal iceweasel lxtask ntfs-3g    \
                network-manager build-essential libxml2-dev ntfs-3g-dev \
                pkg-config libfuse-dev libattr1-dev libssl-dev attr     \
-               p7zip-full unzip unrar'
+               p7zip-full unzip unrar chntpw'
 
 #This variable sets where the initial system files will be temporarily
 #installed
@@ -172,14 +172,15 @@ elif [[ -b "$1" ]] ; then
     info "Will create the system on the device: $DEV"
     
     info "Clearing ${DEV}'s partition table"
-    if ! echo -e 'o\nw\n' |  fdisk $DEV ; then
+    if ! parted -a optimal -s "$DEV" mktable msdos ; then
       die "Could not repartition $DEV"
     fi
     
     info "Creating the $USB partition"
-    if ! parted -a optimal -s "$DEV" mkpart primary 0% 100% ||
-       ! parted "$DEV" set 1 boot on ; then
+    if ! parted -s -a optimal "$DEV" mkpart primary 0% 100% ; then
         die "Could not create the partition"
+    elif ! parted -s "$DEV" set 1 boot on ; then
+        die "Could not make the partition bootable."
     fi
     
     info "Formating and tuning ${USB}'s filesystem"
@@ -230,7 +231,7 @@ else
     info "Security mirror is working"
 fi
 
-#Change the DEFFILES variable to an abosolute directory
+#Change the DEFFILES variable to an absolute directory
 export DEFFILES="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)/$DEFFILES"
 if [[ ! -d $DEFFILES ]] ; then
     die "The $DEFFILES directory does not exist, try changing the configuration value at the top of the script."
@@ -621,8 +622,6 @@ else
 #    elif ! cp -v $CHROOT/{vmlinuz,initrd.img} $MNT ; then
 #        die "Could not copy the kernel and initrd links"
     fi
-    
-    set -x
     
     #This gets everything after vmlinuz- so we can detect the kernel
     #version. This technique is brittle, so we do some error checking
