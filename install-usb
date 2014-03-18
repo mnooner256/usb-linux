@@ -17,10 +17,13 @@ export HTTP_CLIENT_SCRIPT='http://sun1.cs.uca.edu:7000/sh/client-install.sh'
 #These are extra packages that make using the USB far
 #easier. It should include all the packages needed to install
 #any desired OS from $HTTP_CLIENT_SCRIPT
+#Note: python-software-properties adds the ability to use
+#add-apt-repository needed for some software installs
 export EXTRAS='xorg lxde-common lxterminal iceweasel lxtask ntfs-3g    \
                network-manager build-essential libxml2-dev ntfs-3g-dev \
                pkg-config libfuse-dev libattr1-dev libssl-dev attr     \
-               p7zip-full unzip unrar chntpw'
+               p7zip-full unzip unrar chntpw  python-software-properties'
+
 
 #This variable sets where the initial system files will be temporarily
 #installed
@@ -39,7 +42,7 @@ export DEFFILES='def-files'
 export ARCH='amd64'
 
 #The Ubuntu "code name" to use for setting up apt (leave it as is)
-export CODE_NAME='raring'
+export CODE_NAME='saucy'
 
 #The URL of the mirror to use for fetching the initial system files and for
 #apt to use when installing packages
@@ -251,7 +254,8 @@ else
     info "Will look for files in $DEFFILES"
 fi
 
-skip() {
+#DEBUG
+#skip() {
 
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
@@ -523,6 +527,9 @@ info "Creating the root user's Desktop directory"
 if [ ! -d "$CHROOT/root/Desktop" ] ; then
     mkdir "$CHROOT/root/Desktop"
 fi
+
+#DEBUG
+#}
 
 #Tell squashfs not to include these files or directories
 info 'Creating directory-exclusion file'
