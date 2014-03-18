@@ -203,8 +203,13 @@ else
     #Set the build mode
     BUILD="iso"
 
+    #Make sure that the directories in the path exist
+    if [ ! -d "$(dirname "$1")" ] ; then
+        die "The path $(dirname "$1") does not exist"
+    fi
+
     #This is the final location for the ISO file
-    ISO="$1"
+    ISO="$(readlink -f "$1")"
 
     info "Will build the iso file: $ISO"
 
