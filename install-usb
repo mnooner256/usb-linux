@@ -412,6 +412,12 @@ fi
 info "Installing Virtualbox's Guest Additions"
 wget -q http://download.virtualbox.org/virtualbox/debian/oracle_vbox.asc -O- | sudo apt-key add - && apt-get update && apt-get -y install virtualbox-guest-utils
 
+#Try installing the WIM tools
+info "Installing WIM tools
+if ! add-apt-repository -y ppa:nilarimogard/webupd8 && apt-get update && sudo apt-get install wimtools ; then
+    die "Failed to install WIM tools"
+fi
+
 info "Updating the system"
 apt-get -y dist-upgrade && apt-get -y autoremove
 
