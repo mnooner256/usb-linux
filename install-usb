@@ -17,12 +17,12 @@ export HTTP_CLIENT_SCRIPT='http://sun1.cs.uca.edu:7000/sh/client-install.sh'
 #These are extra packages that make using the USB far
 #easier. It should include all the packages needed to install
 #any desired OS from $HTTP_CLIENT_SCRIPT
-#Note: python-software-properties adds the ability to use
+#Note: software-properties-common adds the ability to use
 #add-apt-repository needed for some software installs
 export EXTRAS='xorg lxde-common lxterminal iceweasel lxtask ntfs-3g    \
                network-manager build-essential libxml2-dev ntfs-3g-dev \
                pkg-config libfuse-dev libattr1-dev libssl-dev attr     \
-               p7zip-full unzip unrar chntpw  python-software-properties'
+               p7zip-full unzip unrar chntpw software-properties-common'
 
 
 #This variable sets where the initial system files will be temporarily
