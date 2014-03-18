@@ -251,8 +251,6 @@ else
     info "Will look for files in $DEFFILES"
 fi
 
-skip() {
-
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
 
@@ -482,6 +480,11 @@ then
     die "Could not install the desktop configuration file to default"
 fi
 
+info 'Installing network interfaces file'
+if ! cp -v "$DEFFILES/interfaces" "$CHROOT/etc/network/interfaces" ; then
+    die "Could not install the interfaces file"
+fi
+
 #udev is attached to *this* machine's network card now.
 #Get rid of this rule to make udev think it is a brand new install
 info 'Fixing udev network card rules'
@@ -547,8 +550,6 @@ info 'Creating the file system file.'
 if ! chroot "$CHROOT" /usr/bin/mksquashfs / /filesystem.squashfs -noappend -always-use-fragments -wildcards -ef /tmp/exclude -processors 4; then
     die "Failed to squash the file system."
 fi
-
-}
 
 #This gets everything after vmlinuz- so we can detect the kernel
 #version. This technique is brittle, so we do some error checking
