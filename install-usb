@@ -228,6 +228,7 @@ else
     fi
 fi
 
+
 info "Checking that the main apt mirror is working"
 if ! wget "$MIRROR" -O /dev/null ; then
     die "The mirror $MIRROR appears to be down or invalid"
@@ -249,6 +250,8 @@ if [[ ! -d $DEFFILES ]] ; then
 else
     info "Will look for files in $DEFFILES"
 fi
+
+skip() {
 
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
@@ -539,9 +542,26 @@ if ! cp -v "$DEFFILES/exclude" "$CHROOT/tmp/exclude" ; then
     die 'Could not install the squashfs exclusion file'
 fi
 
+
 info 'Creating the file system file.'
 if ! chroot "$CHROOT" /usr/bin/mksquashfs / /filesystem.squashfs -noappend -always-use-fragments -wildcards -ef /tmp/exclude -processors 4; then
     die "Failed to squash the file system."
+fi
+
+}
+
+#This gets everything after vmlinuz- so we can detect the kernel
+#version. This technique is brittle, so we do some error checking
+#to make sure we got a proper suffix.
+info "Calculating the kernel's version"
+kernel_version=$( basename $CHROOT/boot/vmlinuz* |  sed 's|.*vmlinuz-\(.*$\)|\1|' )
+
+if [[ -z "$kernel_version" ]] ; then
+    die "Could not determine the kernel version number"
+elif [[ ! -f "$CHROOT/boot/vmlinuz-${kernel_version}" ]] ; then
+    die "The kernel version \"$kernel_version\" is not a valid kernel suffix"
+else
+    info "Found the kernel version: $kernel_version"
 fi
 
 if [[ "iso" == $BUILD ]] ; then
@@ -574,9 +594,15 @@ if [[ "iso" == $BUILD ]] ; then
     info "Creating the isolinux configuration file"
     pushd $CHROOT > /dev/null
 
+    kernel_version=$(echo $kernel_version | sed -e 's|-|_|g')
+
     info "Install the isolinux.cfg file"
     if ! cp -v "$DEFFILES/isolinux.cfg" "$ISO_BUILD/isolinux/isolinux.cfg" ; then
         die "Could not install the boot loader configuration file"
+    fi
+
+    if ! sed -i -e "s|version|$kernel_version|" "$ISO_BUILD/isolinux/isolinux.cfg" ; then
+        die "Could not make the isolinux.cfg file kernel version specific"
     fi
 
     ISOTMP="$(dirname $ISO)/temp-$(basename $ISO)"
@@ -630,20 +656,6 @@ else
         die "Could not copy the filesystem.squashfs file to the CD."
     elif ! cp -vR "$CHROOT/boot" "$MNT" ; then
         die "Could not copy the boot directory."
-    fi
-
-    #This gets everything after vmlinuz- so we can detect the kernel
-    #version. This technique is brittle, so we do some error checking
-    #to make sure we got a proper suffix.
-    info "Calculating the kernel's version"
-    kernel_version=$( ls $MNT/boot/vmlinuz* | head -n 1 | \
-                      sed 's|.*vmlinuz-\(.*$\)|\1|' )
-
-    info "Found the kernel version: $kernel_version"
-    if [[ -z "$kernel_version" ]] ; then
-        die "Could not determine the kernel version number"
-    elif [[ ! -f "$MNT/boot/vmlinuz-${kernel_version}" ]] ; then
-        die "The kernel version \"$kernel_version\" is not a valid kernel suffix"
     fi
 
     #Install the boot loader's configuration file
