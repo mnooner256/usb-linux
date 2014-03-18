@@ -251,6 +251,8 @@ else
     info "Will look for files in $DEFFILES"
 fi
 
+skip() {
+
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
 
@@ -493,23 +495,6 @@ if [ -e /media/chroot/etc/udev/rules.d/70-persistent-net.rules ] && \
     warn "Could not fix network card udev rules"
 fi
 
-#By default the interfaces file has allow-hotplug instead of
-#the auto keyword. The allow-hotplug won't allow the network
-#card to start. We need the interfaces file to be modified
-#before ifup is executed. So we will rewrite part of the
-#networking startup script to fix the interfaces file
-#just before ifup is executed.
-info "Fixing network startup script"
-awk "
-/ifup -a/ { 
-    print \"\tsed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces\" ; 
-    print \"\tmv /tmp/interfaces  /etc/network/interfaces\" 
-} 
-
-{print \$0}" "$CHROOT/etc/init.d/networking" > /tmp/networking
-mv -v "/tmp/networking" "$CHROOT/etc/init.d/networking"
-chmod -v 755 "$CHROOT/etc/init.d/networking"
-
 #We will shrink the size of the ISO by zeroing out documentation
 #and log files.
 info 'Discovering what files to zero out...'
@@ -545,11 +530,11 @@ if ! cp -v "$DEFFILES/exclude" "$CHROOT/tmp/exclude" ; then
     die 'Could not install the squashfs exclusion file'
 fi
 
-
 info 'Creating the file system file.'
 if ! chroot "$CHROOT" /usr/bin/mksquashfs / /filesystem.squashfs -noappend -always-use-fragments -wildcards -ef /tmp/exclude -processors 4; then
     die "Failed to squash the file system."
 fi
+
 
 #This gets everything after vmlinuz- so we can detect the kernel
 #version. This technique is brittle, so we do some error checking

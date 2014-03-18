@@ -2,12 +2,12 @@
 
 #Include the default bashrc file
 . /etc/skel/.bashrc
- 
+
 #Set the prompt
 export PS1="\\[\\033[0;31m\\]\\u:\\w#\\[\\033[0m\\] "
- 
+
 umask 022
- 
+
 #Make file removal interactive by default
 alias rm="rm -i"
 
@@ -16,20 +16,25 @@ if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
   sed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces
   mv /tmp/interfaces  /etc/network/interfaces
 
-  if ! ( stop networking ; start networking ); then
+  if ! grep -q eth0 /etc/network/interfaces ; then
+      echo -e 'auto eth0\niface eth0 inet dhcp' >> /etc/network/interfaces
+
+  fi
+
+  if ! /sbin/ifup -a ; then
     echo "Networking is not functioning!!!!"
   fi
-  
+
   echo "Sleeping 5 seconds to let the system sync"
   sleep 10s
-  
+
   #Try pinging again
   if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
     echo "Failed to bring the network online!!!"
     exit 1
   fi
 fi
- 
+
 #If this is the first virtual terminal, then download and run the installer
 if tty | grep tty1 > /dev/null ; then
   #Fetch the file
@@ -40,7 +45,7 @@ if tty | grep tty1 > /dev/null ; then
     echo 'Failed to download the client script'
     exit 1
   fi
-  
+
   #Make sure the download went OK
   if [ -e $HOME/client-install.sh ] ; then
     #Make the file executable
