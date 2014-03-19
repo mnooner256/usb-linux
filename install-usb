@@ -381,10 +381,10 @@ function die {
     exit 128
 }
 
-info "Beginning chroot install"
-
 #Unmount the directories when exiting out
 trap "{ umount -lv /proc /sys /tmp /dev; exit 255 }" SIGINT SIGTERM
+
+info "Beginning chroot install"
 
 info "Setting local time"
 ln -svf /usr/share/zoneinfo/US/Central /etc/localtime
@@ -409,19 +409,33 @@ apt-get update || apt-get update
 if ! apt-get -y install $KERNEL $HEADERS dhcpcd squashfs-tools  \
                         dialog mingetty vim-nox wget jfsutils \
                         parted gpm laptop-detect debootstrap less  \
-                        initramfs-tools live-boot locales \
+                        initramfs-tools live-boot language-pack-en-base \
+                        dkms virtualbox-guest-utils \
                         debconf-utils lilo $EXTRAS ; then
     die "Failed to install all of the required software"
 fi
 
+info "Installing extra repos"
+#if ! wget -q http://download.virtualbox.org/virtualbox/debian/oracle_vbox.asc -O- | apt-key add - ; then
+#    die "Failed to add the virtualbox repository"
+if ! add-apt-repository -y ppa:nilarimogard/webupd8 ; then
+    die "Failed to add the WIM tools repositiory"
+fi
+
+info "Updating apt's repo list"
+if ! apt-get update ; then
+    die "Failed to update apt's repos list after additions"
+fi
+
 #Try installing Virtualbox's Guest additions in case
 #we use the system in a VM
-info "Installing Virtualbox's Guest Additions"
-wget -q http://download.virtualbox.org/virtualbox/debian/oracle_vbox.asc -O- | sudo apt-key add - && apt-get update && apt-get -y install virtualbox-guest-utils
+#if ! apt-get -y install virtualbox-guest-utils ; then
+#    die "Failed to install virtualbox's guest utils"
+#fi
 
 #Try installing the WIM tools
 info "Installing WIM tools"
-if ! add-apt-repository -y ppa:nilarimogard/webupd8 && apt-get update && sudo apt-get install wimtools ; then
+if ! apt-get -y install wimtools ; then
     die "Failed to install WIM tools"
 fi
 
@@ -445,7 +459,7 @@ elif ! mv -v /tmp/sudoers.tmp /etc/sudoers ; then
     die 'Could not replace sudoers file with new one.'
 fi
 
-info "Making root own /root"
+info "Making sure root owns everythin in /root"
 chown -R root:root /root
 
 #Make mingetty auto-login on tty1
