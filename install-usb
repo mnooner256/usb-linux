@@ -247,15 +247,15 @@ else
 fi
 
 
-info "Checking that the main apt mirror is working"
-if ! wget "$MIRROR" -O /dev/null ; then
+info "Checking that the main apt mirror is working (timeout 30s)"
+if ! wget -q --timeout=30 "$MIRROR" -O /dev/null ; then
     die "The mirror $MIRROR appears to be down or invalid"
 else
     info "Apt mirror is working"
 fi
 
-info "Checking the security updates mirror is working"
-if ! wget "$SEC_MIRROR" -O /dev/null ; then
+info "Checking the security updates mirror is working (timeout 30s)"
+if ! wget -q --timeout=30 "$SEC_MIRROR" -O /dev/null ; then
     die "The mirror $SEC_MIRROR appears to be down or invalid"
 else
     info "Security mirror is working"
@@ -270,7 +270,7 @@ else
 fi
 
 #DEBUG
-#skip() {
+skip() {
 
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
@@ -559,7 +559,7 @@ if [ ! -d "$CHROOT/root/Desktop" ] ; then
 fi
 
 #DEBUG
-#}
+}
 
 #Tell squashfs not to include these files or directories
 info 'Creating directory-exclusion file'
