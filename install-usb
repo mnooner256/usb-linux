@@ -121,6 +121,7 @@ function unmount {
         else
             info "Unmounted $1"
         fi
+        sync
     else
         info "$1 is not mounted"
     fi
@@ -133,8 +134,8 @@ function unmount {
 function unmount_all {
     unmount $CHROOT/tmp
     unmount $CHROOT/dev/pts
-    unmount $CHROOT/dev
     unmount $CHROOT/sys
+    unmount $CHROOT/dev
     unmount $CHROOT/proc
 
     if [[ ! -z "$MNT" ]] ; then
@@ -146,10 +147,10 @@ function unmount_all {
 function mount_all {
 
     info "Mounting the needed directories under $CHROOT"
-    if ! (mount -vt proc proc "$CHROOT/proc"    &&
-          mount -vt tmpfs tmpfs "$CHROOT/tmp"   &&
-          mount -v --rbind /sys "$CHROOT/sys"   &&
-          mount -v --rbind /dev "$CHROOT/dev"   &&
+    if ! (mount -vt proc proc "$CHROOT/proc"            &&
+          mount -vt tmpfs tmpfs "$CHROOT/tmp"           &&
+          mount -vt devtmpfs devtmpfs "$CHROOT/dev"     &&
+          mount -v --rbind /sys "$CHROOT/sys"           &&
           mount -v --rbind /dev/pts "$CHROOT/dev/pts") ; then
         die 'A mount failed!'
     fi
@@ -270,7 +271,7 @@ else
 fi
 
 #DEBUG
-skip() {
+#skip() {
 
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
@@ -404,20 +405,23 @@ fi
 apt-get clean
 apt-get update || apt-get update
 
+#Install locales first to supress a lot of language warnings
+info "Installing locales"
+if ! apt-get -y install language-pack-en-base ; then
+    error "Failed to install locales"
+fi
+
 #Note lilo was added because otherwise the kernel will install grub2
 #automatically
 if ! apt-get -y install $KERNEL $HEADERS dhcpcd squashfs-tools  \
                         dialog mingetty vim-nox wget jfsutils \
                         parted gpm laptop-detect debootstrap less  \
-                        initramfs-tools live-boot language-pack-en-base \
-                        dkms virtualbox-guest-utils \
-                        debconf-utils lilo $EXTRAS ; then
+                        initramfs-tools live-boot \
+                        dkms debconf-utils lilo $EXTRAS ; then
     die "Failed to install all of the required software"
 fi
 
 info "Installing extra repos"
-#if ! wget -q http://download.virtualbox.org/virtualbox/debian/oracle_vbox.asc -O- | apt-key add - ; then
-#    die "Failed to add the virtualbox repository"
 if ! add-apt-repository -y ppa:nilarimogard/webupd8 ; then
     die "Failed to add the WIM tools repositiory"
 fi
@@ -427,17 +431,11 @@ if ! apt-get update ; then
     die "Failed to update apt's repos list after additions"
 fi
 
-#Try installing Virtualbox's Guest additions in case
-#we use the system in a VM
-#if ! apt-get -y install virtualbox-guest-utils ; then
-#    die "Failed to install virtualbox's guest utils"
-#fi
-
-#Try installing the WIM tools
 info "Installing WIM tools"
 if ! apt-get -y install wimtools ; then
-    die "Failed to install WIM tools"
+    die "Failed to install WIM imaging tools"
 fi
+
 
 info "Updating the system"
 apt-get -y dist-upgrade && apt-get -y autoremove
@@ -485,8 +483,8 @@ if ! LANG=C chroot $CHROOT /chroot-install ; then
     die "Chroot install failed!"
 fi
 
-info "Unmount filesystems after chroot"
-unmount_all
+#DEBUG
+#}
 
 #For some reason the chroot changes the host environment's hostname
 #value. This is to change it back.
@@ -559,7 +557,7 @@ if [ ! -d "$CHROOT/root/Desktop" ] ; then
 fi
 
 #DEBUG
-}
+#}
 
 #Tell squashfs not to include these files or directories
 info 'Creating directory-exclusion file'
