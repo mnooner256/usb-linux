@@ -29,13 +29,17 @@ adjust the variable values at the top of the script. After that simply run
 the script as the root user. Note, this script relies on the underlying OS being
 Debian Linux or a derivative (i.e. Debian, Ubuntu, Mint, etc).
 
+If you want to install the script to a USB drive, simply provide the device
+file's name. The script does some error checking to make sure that the provided
+file is, in fact, a USB block device.
+
 ```bash
 $ sudo ./install-usb /dev/sdc
 ```
 
-The script can also create ISO files. I need an ISO of the system so that I
-could test under VirtualBox, which does not like boot from the USB drive.
-Simply pass in a file path ending in .iso, and the script will do the write
+The script can also create ISO files. I use an ISO of the system so that I
+can test under VirtualBox, which will not boot from the USB drive.
+Simply pass in a file path ending in .iso, and the script will do the right
 thing.
 
 ```bash
@@ -45,43 +49,44 @@ $ sudo ./install-usb some/path/usb.iso
 Important Variables
 -------------------
 
-Every computer system is different. Toward this end, the script can be easily
+Every computer system is different. With this in mind, the script can be easily
 configured by simply changing the values of several variables located at the
 beginning of the script.
 
-* **$HTTP_CLIENT_SCRIPT** - Installation to the hard drive is handled by a
-separate script. We do not want to recreate the USB drive OS just to update
-the script. So the process is configured to download the script when tty1 logs
-in after boot. This variable holds the client installation script URL.
+* **$HTTP_CLIENT_SCRIPT** - Installation of client OS's to the hard drive is
+handled by a separate script. We do not want to recreate the USB drive OS just
+to update the script. So the process is configured to download the script
+when tty1 logs in after boot. This variable holds the client installation
+script URL.
 * **$EXTRAS** - This is a list of extra packages to install beyond the bare
 minimum system. These packages should make using the system much more
 convenient.
 * **$CHROOT** - This variable will hold the location of the directory we are
 going to install the minimal system into. We will later chroot into the
-environment. The path used does not matter, except it should point to an
-non-existent directory (we will create it later) on a partition that has
+environment. The path used does not matter, except be on a partition that has
 several hundred megabytes of space. For example, /media/chroot, or
-/home/me/chroot will work fine.
+/home/me/chroot will work fine. The script will empty this directory when it
+is executed.
 * **$ISO_BUILD** - When creating an ISO file, a temporary filesystem must be
 created in the host. This is the location where these files will reside. The
-path used does not matter, except it should point to an non-existent directory
-(we will create it later) on a partition that has several hundred megabytes of
-space.
+path used does not matter, except be on a partition that has several hundred
+megabytes of space. The script will empty this directory when it is executed.
 * **$ARCH** - This variable's value tells us what type of architecture we are
 going to install, e.g. i386, amd64, etc.
 * **$CODE_NAME** - This variable tells us what version of system we are
 installing. This is done by providing the adjective in the distro's version
 code name. Note, this value is case sensitive, always use lower case. For
-example, "raring" or "precise".
-* **$MIRROR** - This variable that will hold our primary repository. You can
+example, "saucy" or "raring".
+* **$MIRROR** - This variable will hold our primary repository. You can
 use any valid Ubuntu mirror. By default this value uses the main
 "http://archive.ubuntu.com/ubuntu" mirror.
 * **$SEC_MIRROR** - This variable is the URL of the security updates mirror. The
-value included in the script actually calculates the value based on
-**$MIRRIR**.
+value included in the script actually calculates the value based on the
+**$MIRROR** variable's value.
 * **$KERNEL** - This variable holds the name of the kernel package to install.
 * **$HEADERS** - This variable holds the name of the kernel headers package to
-install. The actual value is calculated from the value of **$KERNEL**.
+install. The actual value is calculated from the value based on the
+**$KERNEL** variable's value.
 
 Changelog
 ---------
