@@ -42,7 +42,7 @@ export DEFFILES='def-files'
 export ARCH='amd64'
 
 #The Ubuntu "code name" to use for setting up apt (leave it as is)
-export CODE_NAME='saucy'
+export CODE_NAME='raring'
 
 #The URL of the mirror to use for fetching the initial system files and for
 #apt to use when installing packages
