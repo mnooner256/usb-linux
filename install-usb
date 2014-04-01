@@ -77,32 +77,26 @@ function warn {
 #code.
 #param: The error message to display.
 #usage: die "This is an error"
-function error_exit {
+function die {
     unmount_all
 
     #Create the line of asterisks
-    stars=$( printf '%0.1s' "*"{1..75} )
+    local stars=$( printf '%0.1s' "*"{1..75} )
 
     printf "\n\033[1;31m$stars\n\n"
 
     #Print out message, limit the line length to 70 chars
-    echo -e "$@" | fold -s -w 70
+    printf "Error ${0} (@%s): %s" "${BASH_LINENO[0]}" "$@" | fold -s -w 70
 
-    printf "\n$stars\033[0;49m\n"
+    printf "\n\n$stars\033[0;49m\n"
     exit 1
 }
 
 #Trap the killer signals so that we can exit with a good message
-trap "error_exit 'Received signal SIGHUP, exiting.'" SIGHUP
-trap "error_exit 'Received signal SIGINT, exiting.'" SIGINT
-trap "error_exit 'Received signal SIGTERM, exiting.'" SIGTERM
+trap "die 'Received signal SIGHUP, exiting.'" SIGHUP
+trap "die 'Received signal SIGINT, exiting.'" SIGINT
+trap "die 'Received signal SIGTERM, exiting.'" SIGTERM
 
-#Alias the function so that it will print a message with the following format:
-#prog-name(@line#): message
-#We have to explicitly allow aliases, we do this because they make calling the
-#function much easier (see example)
-shopt -s expand_aliases
-alias die='error_exit "Error ${0}(@`echo $(( $LINENO - 1 ))`):"'
 
 #This function checks that a given device or path is mounted, and if the
 #parameter is, this function then unmounts it.
@@ -591,6 +585,8 @@ if [[ "iso" == $BUILD ]] ; then
     # Create ISO Image File
     #
     ##########################################################################
+    unmount_all
+
     info "Creating directories for the ISO image."
     if ! mkdir -pv "$ISO_BUILD"/{isolinux,live,boot} ; then
         die "Could not create directories for ISO filesystem at $ISO_BUILD"
