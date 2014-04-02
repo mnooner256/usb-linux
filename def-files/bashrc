@@ -11,7 +11,8 @@ umask 022
 #Make file removal interactive by default
 alias rm="rm -i"
 
-if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
+echo 'Attempting to ping sun1.cs.uca.edu'
+if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
   echo 'Ping failed. Trying to configure eth0!!!'
   sed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces
   mv /tmp/interfaces  /etc/network/interfaces
@@ -21,17 +22,21 @@ if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
 
   fi
 
-  sync
-
   if ! /sbin/ifup -a ; then
     echo "Networking is not functioning!!!!"
   fi
 
+  echo 'Syncing system'
+  sync
+
   #Try pinging again
   if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
-    echo "Failed to bring the network online!!!"
+    echo "Failed to bring the network on line!!!"
     exit 1
   fi
+
+else
+    echo 'Network is functioning'
 fi
 
 #If this is the first virtual terminal, then download and run the installer
