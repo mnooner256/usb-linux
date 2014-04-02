@@ -95,9 +95,9 @@ function die {
     for i in ${BASH_LINENO[*]} ; do
         i=$((i - 1))
         if (( "$i" > 0 )) ; then
-            line=$( sed -n "${i}p" $0 )
-            if [[ "${#line}" > 30 ]] ; then
-                line=$( echo "${line:0:30}..." | sed -e 's/^[ \t]\+//' )
+            line=$( sed -n -e "${i}s/^[ \t]\+//p" ${BASH_SOURCE[0]} )
+            if (( "${#line}" > 30 )) ; then
+                line="${line:0:30}..."
             fi
             printf '@%d\t%s\n' "$i" "$line"
         fi

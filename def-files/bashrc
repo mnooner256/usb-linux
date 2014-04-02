@@ -30,7 +30,7 @@ if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
   sync
 
   #Try pinging again
-  if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
+  if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
     echo "Failed to bring the network on line!!!"
     exit 1
   fi
