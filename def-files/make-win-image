@@ -1,0 +1,178 @@
+#!/bin/bash -e
+
+#Source block device file
+SOURCE=/dev/sda
+
+#Windows Partition
+WIN=${SOURCE}2
+
+#Boot partition
+BOOT=${SOURCE}1
+
+#The shared folder to be mounted.
+SHARE=img
+
+#The location to mount the shared folder at
+MNT=/media/image
+
+#Filename of the windows image file to create
+IMG_FILE=win7.wim
+
+#Optional description of the
+IMG_NAME='Windows 7 base install'
+
+
+#This function displays information messages using a blue font.
+#param: The message to display.
+#usage: info "This is some information"
+function info {
+    echo -e "\033[1;34m$@\033[0;49m"
+}
+
+#This function displays warnings in a yellow font.
+#param: The message to display.
+#usage: warn "This is a warning"
+function warn {
+    echo -e "\033[1;33mWARNING: $@\033[0;49m"
+}
+
+#This function displays information messages using a green font.
+#param: The message to display.
+#usage: success "This is some information"
+function success {
+    echo -e "\033[1;32m$@\033[0;49m"
+}
+
+#This function is used to cleanly exit the script. It does this by unmounting
+#all devices, displaying a given error message, the line before die was called,
+#and exiting with an error code.
+#param: The error message to display.
+#usage: die "This is an error"
+function die {
+    #Create the line of asterisks
+    local stars=$( printf '%0.1s' "*"{1..75} )
+
+    #Variable that will hold the line before the call
+    local line
+
+    #Print stars and file field
+    printf "\n\033[1;31m$stars\n\nERROR\n\nFile:"
+    printf "\t$( readlink -f ${BASH_SOURCE[0]} )\n"
+
+    #Print the stack, along with the probable offending line
+    printf "\nStack:\n"
+    for i in ${BASH_LINENO[*]} ; do
+        i=$((i - 1))
+        if (( "$i" > 0 )) ; then
+            line=$( sed -n -e "${i}s/^[ \t]\+//p" ${BASH_SOURCE[0]} )
+            if (( "${#line}" > 30 )) ; then
+                line="${line:0:30}..."
+            fi
+            printf '@%d\t%s\n' "$i" "$line"
+        fi
+    done
+
+    #Print the error message
+    printf "\nReason:\n"
+    echo "$@" | fold -s -w 70 | sed -e 's/^[ \t]*//' -e 's/^/\t/'
+
+    #Closing stars
+    printf "\n\n$stars\033[0;49m\n"
+    exit 1
+}
+
+function sig_exit {
+    printf "\n\033[1;41m$@\033[0;49m\n"
+    exit 2
+}
+
+#Trap the killer signals so that we can exit with a good message
+trap "sig_exit 'Received signal SIGHUP, exiting.'" SIGHUP
+trap "sig_exit 'Received signal SIGINT, exiting.'" SIGINT
+trap "sig_exit 'Received signal SIGTERM, exiting.'" SIGTERM
+
+if ! modinfo vboxsf &> /dev/null ; then
+    info 'Updating apt'
+    if apt-get -y update &> /dev/null ; then
+        success 'Apt is now updated'
+    else
+        warn 'Failed to update apt'
+    fi
+
+    info 'Checking for a bad installation of guest utils'
+    if dpkg -s virtualbox-guest-utils &> /dev/null ; then
+        info 'Found a bad previous install, uninstalling'
+        if ! apt-get purge virtualbox-guest-utils ; then
+            die 'Failed to purge previous bad guest utils install'
+        else
+            success 'Done'
+        fi
+    else
+        success 'Guest utils not installed'
+    fi
+
+    info 'Installing virtualbox guest utils, this may take several minutes'
+    if apt-get -y install virtualbox-guest-utils | tee /tmp/install.log ; then
+        if grep -i -q error /tmp/install.log ; then
+            die 'Failed to install the dkms module'
+        fi
+    else
+        die 'Failed to install guest utils'
+    fi
+
+else
+    success 'Virtualbox guest utils kernel module is installed'
+fi
+
+if ! lsmod | grep -q '^vboxsf' ; then
+    info 'Starting shared folders kernel module'
+    if modprobe -v vboxsf ; then
+        success 'Done'
+    else
+        die 'Failed to start kernel module'
+    fi
+else
+    success 'Guest utils kernel module is loaded'
+fi
+
+
+if [[ ! -d $MNT ]] ; then
+    if ! mkdir -v -p $MNT ; then
+        die "Could not created the mount directory $MNT"
+    fi
+fi
+
+if mount | grep -q "$SHARE.*$MNT" ; then
+    warn 'Shared folder already mounted, but at wrong location'
+    if umount $SHARE ; then
+        success 'Unmounted the shared folder'
+    else
+        die 'Could not adjust shared folder mount point'
+    fi
+fi
+
+if ! mount | grep -q "$SHARE" ; then
+    info 'Mounting the shared folders filesystem'
+    if ! mount -t vboxsf $SHARE $MNT ; then
+        die 'Failed to mount the shared folders file system'
+    fi
+fi
+
+base_name=$(basename $IMG_FILE .wim)
+main_file=${MNT}/${base_name}.wim
+boot_file=${MNT}/${base_name}-boot.wim
+
+info 'Beginning image capture, this will take a long time'
+export LANG='en_US.UTF-8'
+if ! wimlib-imagex capture "$WIN" "$main_file" "$IMG_NAME" --compress=maximum; then
+    die 'Failed to capture the windows image'
+fi
+
+info 'Beginning image capture of boot partition'
+export LANG='en_US.UTF-8'
+if ! wimlib-imagex capture "$BOOT" "$boot_file" "Boot $IMG_NAME" --compress=maximum --boot; then
+    die 'Failed to capture the windows image'
+fi
+
+
+success 'Finished successfully'

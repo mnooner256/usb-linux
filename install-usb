@@ -97,21 +97,23 @@ function die {
         if (( "$i" > 0 )) ; then
             line=$( sed -n "${i}p" $0 )
             if [[ "${#line}" > 30 ]] ; then
-                line="${line:0:30}..."
+                line=$( echo "${line:0:30}..." | sed -e 's/^[ \t]\+//' )
             fi
-            printf '@%d\t%30s\n' "$i" "$line"
+            printf '@%d\t%s\n' "$i" "$line"
         fi
     done
 
     #Print the error message
     printf "\nReason:\n"
-    echo "$@" | fold -s -w 70 | sed 's/^/\t/'
+    echo "$@" | fold -s -w 70 | sed -e 's/^[ \t]*//' -e 's/^/\t/'
 
     #Closing stars
     printf "\n\n$stars\033[0;49m\n"
     exit 1
 }
 
+#This function is called by the signal traps. It just displays the message
+#and exits.
 function sig_exit {
     printf "\n\033[1;41m$@\033[0;49m\n"
     exit 2
@@ -577,6 +579,14 @@ fi
 
 #DEBUG
 #}
+
+#Install the disk image creation script on ISO builds
+if [[ "iso" == "$BUILD" ]] ; then
+    info 'Installing the disk creation script'
+    if ! install -v -m 755 $DEFFILES/make-win-image $CHROOT/usr/bin/ ; then
+        die 'Failed to install the image create script'
+    fi
+fi
 
 #Tell squashfs not to include these files or directories
 info 'Creating directory-exclusion file'
