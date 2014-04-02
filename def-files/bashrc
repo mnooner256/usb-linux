@@ -21,6 +21,8 @@ if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
 
   fi
 
+  sync
+
   if ! /sbin/ifup -a ; then
     echo "Networking is not functioning!!!!"
   fi
