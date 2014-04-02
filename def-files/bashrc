@@ -25,9 +25,6 @@ if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
     echo "Networking is not functioning!!!!"
   fi
 
-  echo "Sleeping 5 seconds to let the system sync"
-  sleep 10s
-
   #Try pinging again
   if ! ping -c 1 sun1.cs.uca.edu > /dev/null ; then
     echo "Failed to bring the network online!!!"
