@@ -73,8 +73,8 @@ function warn {
 }
 
 #This function is used to cleanly exit the script. It does this by unmounting
-#all devices, displaying a given error message, and exiting with an error
-#code.
+#all devices, displaying a given error message, the line before die was called,
+#and exiting with an error code.
 #param: The error message to display.
 #usage: die "This is an error"
 function die {
@@ -83,11 +83,31 @@ function die {
     #Create the line of asterisks
     local stars=$( printf '%0.1s' "*"{1..75} )
 
-    printf "\n\033[1;31m$stars\n\n"
+    #Variable that will hold the line before the call
+    local line
 
-    #Print out message, limit the line length to 70 chars
-    printf "Error ${0} (@%s): %s" "${BASH_LINENO[0]}" "$@" | fold -s -w 70
+    #Print stars and file field
+    printf "\n\033[1;31m$stars\n\nERROR\n\nFile:"
+    printf "\t$( readlink -f ${BASH_SOURCE[0]} )\n"
 
+    #Print the stack, along with the probable offending line
+    printf "\nStack:\n"
+    for i in ${BASH_LINENO[*]} ; do
+        i=$((i - 1))
+        if (( "$i" > 0 )) ; then
+            line=$( sed -n "${i}p" $0 )
+            if [[ "${#line}" > 30 ]] ; then
+                line="${line:0:30}..."
+            fi
+            printf '@%d\t%30s\n' "$i" "$line"
+        fi
+    done
+
+    #Print the error message
+    printf "\nReason:\n"
+    echo "$@" | fold -s -w 70 | sed 's/^/\t/'
+
+    #Closing stars
     printf "\n\n$stars\033[0;49m\n"
     exit 1
 }
