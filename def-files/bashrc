@@ -11,36 +11,36 @@ umask 022
 #Make file removal interactive by default
 alias rm="rm -i"
 
-echo 'Attempting to ping sun1.cs.uca.edu'
-if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
-  echo 'Ping failed. Trying to configure eth0!!!'
-  sed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces
-  mv /tmp/interfaces  /etc/network/interfaces
-
-  if ! grep -q eth0 /etc/network/interfaces ; then
-      echo -e 'auto eth0\niface eth0 inet dhcp' >> /etc/network/interfaces
-
-  fi
-
-  if ! /sbin/ifup -a ; then
-    echo "Networking is not functioning!!!!"
-  fi
-
-  echo 'Syncing system'
-  sync
-
-  #Try pinging again
-  if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
-    echo "Failed to bring the network on line!!!"
-    exit 1
-  fi
-
-else
-    echo 'Network is functioning'
-fi
-
 #If this is the first virtual terminal, then download and run the installer
 if tty | grep tty1 > /dev/null ; then
+  echo 'Attempting to ping sun1.cs.uca.edu'
+  if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
+    echo 'Ping failed. Trying to configure eth0!!!'
+    sed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces
+    mv /tmp/interfaces  /etc/network/interfaces
+
+    if ! grep -q eth0 /etc/network/interfaces ; then
+        echo -e 'auto eth0\niface eth0 inet dhcp' >> /etc/network/interfaces
+
+    fi
+
+    if ! /sbin/ifup -a ; then
+      echo "Networking is not functioning!!!!"
+    fi
+
+    echo 'Syncing system'
+    sync
+
+    #Try pinging again
+    if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
+      echo "Failed to bring the network on line!!!"
+      exit 1
+    fi
+
+  else
+      echo 'Network is functioning'
+  fi
+
   #Fetch the file
   if ! wget 'HTTP_CLIENT_SCRIPT' -O - > $HOME/client-install.sh ; then
     if [ -e $HOME/client-install.sh ] ; then
