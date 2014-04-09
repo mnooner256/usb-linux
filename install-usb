@@ -38,7 +38,8 @@ export ISO_BUILD='/media/iso'
 #directory containing this script.
 export DEFFILES='def-files'
 
-#This should be the architecture the new system
+#This should be the architecture the new system,
+#either 'i386' or 'amd64'
 export ARCH='amd64'
 
 #The Ubuntu "code name" to use for setting up apt (leave it as is)
@@ -148,6 +149,33 @@ function unmount {
     fi
 }
 
+function check_mount {
+    local type="$1"
+    local fs="$2"
+    local point="$3"
+
+    #Do nothing if already mounted
+    if grep -q $point /proc/mounts ; then
+        info "$point is already mounted"
+        return
+    fi
+
+    #Bind mounts are different than regular mounts
+    if [[ "$type" == '--rbind' ]] ; then
+        if ! mount -v "$type" "$fs" "$point" ; then
+            die "Failed to bind '$fs' at '$point'"
+        else
+            info "Bound '$fs' at '$point'"
+        fi
+
+    #Do a regular mount
+    elif ! mount -vt "$type" "$fs" "$point" ; then
+        die "Failed to mount '$fs' at '$point'"
+    else
+        info "Mounted '$fs' at '$point'"
+    fi
+}
+
 #This function unmounts all the mount-points created in this script.
 #It is used to clean-up at the end or after an error occurs. This
 #function does not check "devices" it instead calls the unmount
@@ -165,19 +193,16 @@ function unmount_all {
     fi
 }
 
+
+#This function mounts all the directories required to install the system.
 function mount_all {
-
     info "Mounting the needed directories under $CHROOT"
-    if ! (mount -vt proc proc "$CHROOT/proc"            &&
-          mount -vt tmpfs tmpfs "$CHROOT/tmp"           &&
-          mount -vt devtmpfs devtmpfs "$CHROOT/dev"     &&
-          mount -v --rbind /sys "$CHROOT/sys"           &&
-          mount -v --rbind /dev/pts "$CHROOT/dev/pts") ; then
-        die 'A mount failed!'
-    fi
+    check_mount proc proc "$CHROOT/proc"
+    check_mount tmpfs tmpfs "$CHROOT/tmp"
+    check_mount devtmpfs devtmpfs "$CHROOT/dev"
+    check_mount --rbind /sys "$CHROOT/sys"
+    check_mount --rbind /dev/pts "$CHROOT/dev/pts"
 }
-
-
 
 #See if we are the root user
 if [[ "$UID" != "0" ]] ; then
@@ -191,19 +216,27 @@ if [[ -z "$1" ]] ; then
 
 #See if the parameter is a block device
 elif [[ -b "$1" ]] ; then
-    #Be cautious do not use mounted block files
-    if grep -q "$1" /proc/mounts ; then
-        die "The device is mounted, will not continue\n\n$usage"
-
     #Make sure the file is a device not a partition
-    elif [ ! -e /sys/block/$( basename $1 ) ]; then
-        echo /sys/block/$( basename $1 )
-        die "Use a device, not a partition\n\n$usage"
+    if [ ! -e /sys/block/$( basename $1 ) ]; then
+        die "Use a block device, not a partition\n\n$usage"
+    fi
 
     #Make sure the device file is a USB device
     #i.e. not a hard drive!
-    elif ! readlink -e /sys/block/$(basename $1) | grep -q usb ; then
+    if ! readlink -e /sys/block/$(basename $1) | grep -q usb ; then
         die "$1 is not a USB based block device"
+    fi
+
+    #Be cautious, make sure the block device is unmounted
+    if grep -q "$1" /proc/mounts ; then
+        warn "The device $1 is mounted, attempting to unmount"
+        mounted="$(grep "$1" /proc/mounts | awk '{print $1}')"
+
+        if umount -v $mounted ; then
+            info "Unmounted $mounted"
+        else
+            die "Failed to unmount $mounted"
+        fi
     fi
 
     #Set the build mode
@@ -292,7 +325,7 @@ else
 fi
 
 #DEBUG
-#skip() {
+skip() {
 
 info "Unmounting pseudo-filesystems if they are mounted from previous attempt"
 unmount_all
@@ -578,7 +611,7 @@ if [ ! -d "$CHROOT/root/Desktop" ] ; then
 fi
 
 #DEBUG
-#}
+}
 
 #Install the disk image creation script on ISO builds
 if [[ "iso" == "$BUILD" ]] ; then
@@ -705,15 +738,18 @@ else
         die "Could not copy the boot directory."
     fi
 
-    #Install the boot loader's configuration file
-    info "Inserting the kernel version into the extlinux.conf file"
-    if ! sed "s|version|$kernel_version|" "$DEFFILES/extlinux.conf" > "$MNT/extlinux.conf" ; then
-        die "Could not copy the boot loader configuration file"
+    info "Install the extlinux.conf file"
+    if ! cp -v "$DEFFILES/isolinux.cfg" "$MNT/extlinux.conf" ; then
+        die "Could not install the boot loader configuration file"
+    fi
+
+    if ! sed -i -e "s|version|$kernel_version|" -e 's|_|-|g' "$MNT/extlinux.conf" ; then
+        die "Could not make the extlinux.conf file kernel version specific"
     fi
 
     info 'Installing extlinux bootloader'
-    if ! extlinux --install $MNT 2> /dev/null ; then
-        die 'Clould not install extlinux'
+    if ! extlinux --install "$MNT" ; then
+        die 'Could not install extlinux'
     fi
 
     info 'Cleanly unmounting everything before finishing'
