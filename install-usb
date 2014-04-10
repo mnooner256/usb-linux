@@ -40,6 +40,7 @@ export DEFFILES='def-files'
 
 #This should be the architecture the new system,
 #either 'i386' or 'amd64'
+#export ARCH='i386'
 export ARCH='amd64'
 
 #The Ubuntu "code name" to use for setting up apt (leave it as is)
