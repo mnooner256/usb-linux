@@ -13,21 +13,18 @@ alias rm="rm -i"
 
 #If this is the first virtual terminal, then download and run the installer
 if tty | grep -q tty1 ; then
-  echo 'Attempting to ping sun1.cs.uca.edu'
-  if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
+  echo 'Attempting to ping sun0.cs.uca.edu'
+  if ! ping -c 1 -W 1 sun0.cs.uca.edu &> /dev/null ; then
     echo 'Ping failed. Trying to configure eth0!!!'
-#    sed 's/allow-hotplug/auto/' /etc/network/interfaces > /tmp/interfaces
-#    mv /tmp/interfaces  /etc/network/interfaces
 
     if ! grep -q eth0 /etc/network/interfaces ; then
         echo -e 'auto eth0\niface eth0 inet dhcp' >> /etc/network/interfaces
-
     fi
 
     #See if the cable is plugged in
     if ! ethtool eth0 | grep -q 'Link detected.*yes' ; then
       echo "Network cable is unplugged!!!!!!"
-      exit
+      return
     fi
 
     if ! /sbin/ifup -a ; then
@@ -38,9 +35,9 @@ if tty | grep -q tty1 ; then
     sync
 
     #Try pinging again
-    if ! ping -c 1 -W 1 sun1.cs.uca.edu > /dev/null ; then
+    if ! ping -c 1 -W 1 sun0.cs.uca.edu &> /dev/null ; then
       echo "Failed to bring the network on line!!!"
-      exit 1
+      return
     fi
 
   else
@@ -53,7 +50,7 @@ if tty | grep -q tty1 ; then
       rm -f $HOME/client-install.sh
     fi
     echo 'Failed to download the client script'
-    exit 1
+    return
   fi
 
   #Make sure the download went OK
